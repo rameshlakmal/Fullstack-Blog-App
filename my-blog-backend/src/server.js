@@ -4,7 +4,7 @@ import express from 'express';
 import {db,dbconnection} from './db.js';
 
 const credentials =JSON.parse(
-    fs.readFileSync('../credentials.json')
+    fs.readFileSync('./credentials.json')
 );
 admin.initializeApp({
     credential:admin.credential.cert(credentials),
@@ -17,13 +17,15 @@ app.use(express.json());
 app.use(async(req,res,next)=>{
     const {authtoken} = req.header;
 
+
     if (authtoken){
         try{
-    req.user = await admin.auth().verifyIdToken(authtoken);
+            req.user = await admin.auth().verifyIdToken(authtoken);
         }catch(e){
-            res.sendStatus(400);
+            return res.sendStatus(400);
         }
     }
+    req.user = req.user || {};
     next();
 });
 
@@ -34,7 +36,7 @@ app.get('/api/articles/:name',async (req,res)=>{
     const article = await db.collection('articles').findOne({name});
     if(article){
         const upvoteIds = article.upvoteIds || [];
-        article.canUpvote = uid && !upvoteIds.include(uid);
+        article.canUpvote = uid && !upvoteIds.includes(uid);
         res.json(article);
     }else{
         res.sendStatus(404);
@@ -57,7 +59,7 @@ app.put('/api/articles/:name/upvote', async(req,res)=>{
     const article = await db.collection('articles').findOne({name});
     if(article){
         const upvoteIds = article.upvoteIds || [];
-        const canUpvote = uid && !upvoteIds.include(uid);
+        const canUpvote = uid && !upvoteIds.includes(uid);
 
         if(canUpvote){
             await db.collection('articles').updateOne({name},{
