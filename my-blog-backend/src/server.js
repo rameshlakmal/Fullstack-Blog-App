@@ -14,90 +14,85 @@ admin.initializeApp({
 const app = express();
 app.use(express.json());
 
-app.use(async(req,res,next)=>{
-    const {authtoken} = req.header;
+app.use(async (req, res, next) => {
+    const { authtoken } = req.headers;
 
-
-    if (authtoken){
-        try{
+    if (authtoken) {
+        try {
             req.user = await admin.auth().verifyIdToken(authtoken);
-        }catch(e){
+        } catch (e) {
             return res.sendStatus(400);
         }
     }
+
     req.user = req.user || {};
+
     next();
 });
 
-app.get('/api/articles/:name',async (req,res)=>{
-    const {name} = req.params;
-    const {uid} = req.user;
+app.get('/api/articles/:name', async (req, res) => {
+    const { name } = req.params;
+    const { uid } = req.user;
 
-    const article = await db.collection('articles').findOne({name});
-    if(article){
+    const article = await db.collection('articles').findOne({ name });
+
+    if (article) {
         const upvoteIds = article.upvoteIds || [];
         article.canUpvote = uid && !upvoteIds.includes(uid);
         res.json(article);
-    }else{
+    } else {
         res.sendStatus(404);
     }
 });
 
-app.use((req,res,next)=>{
-    if(req.user){
+app.use((req, res, next) => {
+    if (req.user) {
         next();
-    }else{
+    } else {
         res.sendStatus(401);
     }
 });
 
+app.put('/api/articles/:name/upvote', async (req, res) => {
+    const { name } = req.params;
+    const { uid } = req.user;
 
-app.put('/api/articles/:name/upvote', async(req,res)=>{
-    const {name} = req.params;
-    const {uid} =req.user;
+    const article = await db.collection('articles').findOne({ name });
 
-    const article = await db.collection('articles').findOne({name});
-    if(article){
+    if (article) {
         const upvoteIds = article.upvoteIds || [];
         const canUpvote = uid && !upvoteIds.includes(uid);
-
-        if(canUpvote){
-            await db.collection('articles').updateOne({name},{
-                $inc: {upvotes: 1},
-                $push: {upvoteIds: uid},
+   
+        if (canUpvote) {
+            await db.collection('articles').updateOne({ name }, {
+                $inc: { upvotes: 1 },
+                $push: { upvoteIds: uid },
             });
         }
 
-
-
-            const updatedArticle = await db.collection('articles').findOne({name});
-            res.json(updatedArticle);
-    }else{
+        const updatedArticle = await db.collection('articles').findOne({ name });
+        res.json(updatedArticle);
+    } else {
         res.send('That article doesn\'t exist');
     }
 });
 
+app.post('/api/articles/:name/comments', async (req, res) => {
+    const { name } = req.params;
+    const { text } = req.body;
+    const { email } = req.user;
 
-
-app.post('/api/articles/:name/comments', async (req,res)=>{
-    const {name} =req.params;
-    const {text} = req.body;
-    const {email} =req.user;
-
-    await db.collection('articles').updateOne({name},{
-        $push: {comments: {postedBy: email, text}},
+    await db.collection('articles').updateOne({ name }, {
+        $push: { comments: { postedBy: email, text } },
     });
+    const article = await db.collection('articles').findOne({ name });
 
-    const article = await db.collection('articles').findOne({name});
-
-    if(article){
+    if (article) {
         res.json(article);
-    }else{
-        res.send('That article doesn\'t exist');
+    } else {
+        res.send('That article doesn\'t exist!');
     }
-
 });
-
 
 dbconnection(()=>{
     console.log('Successfully connected to the database...!')
